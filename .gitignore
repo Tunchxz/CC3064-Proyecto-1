@@ -1,0 +1,6 @@
+# Binaries
+servidor
+cliente
+
+# Object files
+*.o
