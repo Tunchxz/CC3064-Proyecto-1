@@ -46,7 +46,8 @@ void cl_build_list(char *buf, size_t buflen);
 /* Get IP and status for a user. Returns 0 on success, -1 if not found. */
 int cl_get_info(const char *username, char *buf, size_t buflen);
 
-/* Update last activity timestamp for a client by fd. */
-void cl_touch(int sockfd);
+/* Update last activity timestamp. Returns 1 if client was reactivated from
+   INACTIVE to ACTIVE, 0 otherwise. */
+int cl_touch(int sockfd);
 
 #endif

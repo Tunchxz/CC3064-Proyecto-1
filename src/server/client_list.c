@@ -120,10 +120,17 @@ int cl_get_info(const char *username, char *buf, size_t buflen) {
     return ret;
 }
 
-void cl_touch(int sockfd) {
+int cl_touch(int sockfd) {
+    int reactivated = 0;
     pthread_mutex_lock(&mutex_lista);
     int idx = cl_find_by_fd(sockfd);
-    if (idx >= 0)
+    if (idx >= 0) {
         lista[idx].ultimo_mensaje = time(NULL);
+        if (strcmp(lista[idx].status, "INACTIVE") == 0) {
+            strncpy(lista[idx].status, "ACTIVE", 15);
+            reactivated = 1;
+        }
+    }
     pthread_mutex_unlock(&mutex_lista);
+    return reactivated;
 }

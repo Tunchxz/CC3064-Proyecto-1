@@ -26,8 +26,17 @@ static void *client_thread(void *arg) {
         if (recv_packet(sockfd, &pkt) != 0)
             break; /* disconnect or error */
 
-        /* Update activity timestamp */
-        cl_touch(sockfd);
+        /* Update activity timestamp; reactivate if was INACTIVE */
+        if (cl_touch(sockfd)) {
+            ChatPacket notif;
+            memset(&notif, 0, sizeof(notif));
+            notif.command = CMD_MSG;
+            strncpy(notif.sender, "SERVER", 31);
+            strncpy(notif.payload, "Tu status volvió a ACTIVE", 956);
+            notif.payload_len = (uint16_t)strlen(notif.payload);
+            send_packet(sockfd, &notif);
+            printf("[SERVER] %s reactivado a ACTIVE\n", pkt.sender);
+        }
 
         switch (pkt.command) {
         case CMD_REGISTER:
