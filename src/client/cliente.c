@@ -10,6 +10,10 @@
 #include "client/client_ui.h"
 
 static volatile int running = 1;
+static pthread_t main_tid;
+
+/* No-op handler: only purpose is to interrupt blocking fgets() */
+static void sigusr1_handler(int sig) { (void)sig; }
 
 /* ── Receiver thread: reads packets from server and displays them ── */
 static void *recv_thread(void *arg) {
@@ -21,6 +25,7 @@ static void *recv_thread(void *arg) {
             if (running) {
                 printf("\n[!] Conexión con el servidor perdida.\n");
                 running = 0;
+                pthread_kill(main_tid, SIGUSR1); /* interrupt fgets */
             }
             break;
         }
@@ -38,6 +43,15 @@ int main(int argc, char *argv[]) {
     }
 
     signal(SIGPIPE, SIG_IGN);
+
+    /* SIGUSR1 interrupts blocking fgets when server disconnects */
+    struct sigaction sa;
+    sa.sa_handler = sigusr1_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0; /* no SA_RESTART — we want fgets to be interrupted */
+    sigaction(SIGUSR1, &sa, NULL);
+
+    main_tid = pthread_self();
 
     const char *username  = argv[1];
     const char *server_ip = argv[2];
