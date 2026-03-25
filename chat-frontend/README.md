@@ -1,163 +1,166 @@
 # Chat UVG — Frontend Web
 
-Interfaz web tipo WhatsApp para el proyecto de chat en C.
-No toca nada del servidor ni del cliente C original.
+Interfaz web tipo WhatsApp para el proyecto de chat en C. Se comunica con el servidor C a través de un bridge Node.js que traduce WebSocket ↔ TCP binario. No modifica el servidor ni el cliente C.
+
+## Flujo de conexión
+
+```
+Browser (React, :3000)
+    ↕  WebSocket
+Bridge Node.js (:4000)
+    ↕  TCP binario (ChatPacket 1024 bytes)
+Servidor C (:8080)
+```
+
+El bridge abre una conexión TCP independiente por cada usuario del browser. El servidor C los ve como clientes normales.
 
 ## Estructura
 
 ```
 chat-frontend/
 ├── bridge/
-│   ├── bridge.js       ← Puente WebSocket ↔ TCP binario (Node.js)
+│   ├── bridge.js         # Puente WebSocket ↔ TCP binario
 │   └── package.json
 └── frontend/
-    ├── public/
-    │   └── index.html
+    ├── public/index.html
     └── src/
-        ├── index.js
-        ├── index.css
-        ├── App.js
-        ├── App.module.css
-        └── useChat.js
+        ├── App.js            # Componentes: LoginScreen, ChatScreen, modales
+        ├── App.module.css    # Estilos con CSS Modules
+        ├── index.css         # Variables de tema globales
+        ├── index.js          # Entry point de React
+        └── useChat.js        # Hook de estado y comunicación WebSocket
 ```
 
-## Flujo de conexión
+## Instalación
 
-```
-Tu navegador (React)
-      ↕  WebSocket :4000
-   bridge.js (Node.js)
-      ↕  TCP binario :8080
-   servidor C (WSL/Linux)
-```
+### Requisitos
 
----
+- Node.js v18+ ([descargar LTS](https://nodejs.org))
+- Servidor C corriendo (`./servidor 8080`)
 
-## INSTALACIÓN PASO A PASO
-
-### 1. Instalar Node.js
-
-Descarga desde https://nodejs.org la versión **LTS** (la que dice "Recommended").
-Instálalo normalmente. Para verificar que quedó instalado:
-
+Verificar instalación:
 ```bash
-node --version    # debe mostrar v18.x o superior
+node --version    # v18.x o superior
 npm --version
 ```
 
-### 2. Copiar la carpeta `chat-frontend`
-
-Pon la carpeta `chat-frontend` en cualquier lugar de tu máquina.
-Por ejemplo: `C:\Users\TuNombre\chat-frontend` en Windows.
-
-### 3. Instalar dependencias del bridge
-
-Abre una terminal (CMD, PowerShell o la terminal de VS Code):
+### Instalar dependencias
 
 ```bash
-cd chat-frontend/bridge
-npm install
+cd chat-frontend/bridge && npm install
+cd chat-frontend/frontend && npm install
 ```
 
-### 4. Instalar dependencias del frontend
+## Cómo ejecutar
 
-Abre **otra** terminal:
+Se necesitan **3 terminales** (o usar Docker Compose desde la raíz del proyecto):
 
-```bash
-cd chat-frontend/frontend
-npm install
-```
-
----
-
-## CÓMO USARLO
-
-### Paso A — Inicia el servidor C (en WSL/Linux)
-
-En tu terminal de WSL, en la carpeta del proyecto original:
-
+**Terminal 1 — Servidor C:**
 ```bash
 ./servidor 8080
 ```
 
-### Paso B — Inicia el bridge
-
-En una terminal en tu máquina Windows (o Linux):
-
+**Terminal 2 — Bridge:**
 ```bash
 cd chat-frontend/bridge
 node bridge.js
+# ✅ Bridge corriendo en ws://localhost:4000
 ```
 
-Deberías ver:
-```
-✅ Bridge corriendo en ws://localhost:4000
-   Conectando al servidor C en 127.0.0.1:8080
-```
-
-> **Nota**: Si tu servidor C corre en otra IP o puerto, cámbialo así:
-> ```bash
-> CHAT_HOST=192.168.1.50 CHAT_PORT=9090 node bridge.js
-> ```
-> En Windows (CMD):
-> ```cmd
-> set CHAT_HOST=127.0.0.1 && set CHAT_PORT=8080 && node bridge.js
-> ```
-
-### Paso C — Inicia el frontend React
-
-En otra terminal:
-
+**Terminal 3 — Frontend:**
 ```bash
 cd chat-frontend/frontend
 npm start
+# Abre http://localhost:3000 automáticamente
 ```
 
-Esto abre automáticamente `http://localhost:3000` en tu navegador.
-
-### Paso D — Conéctate
+### Conectarse
 
 1. Escribe tu nombre de usuario
-2. Haz clic en **Conectar**
-3. ¡Listo! Puedes abrir múltiples pestañas con diferentes usuarios
+2. Ingresa IP y puerto del servidor (`127.0.0.1` / `8080` para local)
+3. Clic en **Conectar**
+4. Puedes abrir múltiples pestañas con diferentes usuarios
 
----
+## Configuración del bridge
 
-## COMANDOS DISPONIBLES EN LA UI
+El bridge toma la IP/puerto del servidor desde el frontend por defecto. Para forzar una conexión fija (útil en Docker o WSL), usa variables de entorno:
 
-| Acción                        | Cómo hacerlo                                           |
-|-------------------------------|--------------------------------------------------------|
-| Mensaje a todos               | Escribe en el canal **# General**                      |
-| Mensaje directo               | Haz clic en un usuario en el sidebar → escribe ahí     |
-| Cambiar estado                | Clic en tu estado (●Activo) en el sidebar              |
-| Ver lista de usuarios         | Sidebar (se actualiza con el botón ↻)                  |
-| Ver info (IP) de un usuario   | Botón ⓘ al lado del usuario, o "Ver info" en el header |
-| Salir                         | Botón ⏻ en la esquina superior izquierda               |
+```bash
+# Linux / macOS
+CHAT_HOST=192.168.1.50 CHAT_PORT=9090 node bridge.js
 
----
+# Windows (CMD)
+set CHAT_HOST=192.168.1.50 && set CHAT_PORT=9090 && node bridge.js
+```
 
-## SOLUCIÓN DE PROBLEMAS
+## Acciones en la UI
+
+| Acción                 | Cómo hacerlo                                        |
+| ---------------------- | --------------------------------------------------- |
+| Mensaje a todos        | Escribe en el canal **# General**                   |
+| Mensaje directo        | Clic en un usuario del sidebar, escribe ahí         |
+| Cambiar estado         | Clic en tu estado (● Activo ▾) en el sidebar        |
+| Ver lista de usuarios  | Sidebar (se actualiza automáticamente, o botón ↻)   |
+| Ver info de un usuario | Botón ⓘ junto al usuario, o "Ver info" en el header |
+| Salir                  | Botón ⏻ arriba a la izquierda                       |
+
+## Despliegue manual en EC2
+
+Si no usas Docker, puedes correr los 3 procesos manualmente con `tmux`:
+
+Puertos a abrir en el **Security Group**:
+
+| Puerto | Para qué         |
+| ------ | ---------------- |
+| `8080` | Servidor C       |
+| `4000` | Bridge WebSocket |
+| `3000` | Frontend React   |
+
+```bash
+# Ventana 1 — servidor C
+tmux new -s servidor
+./servidor 8080
+# Ctrl+B, D para desconectar
+
+# Ventana 2 — bridge
+tmux new -s bridge
+cd chat-frontend/bridge && node bridge.js
+# Ctrl+B, D
+
+# Ventana 3 — frontend
+tmux new -s frontend
+cd chat-frontend/frontend && npm start
+# Ctrl+B, D
+```
+
+Acceder desde el browser: `http://<IP-PUBLICA-EC2>:3000`
+
+> Para producción se recomienda `npm run build` y servir `build/` con nginx en el puerto 80.
+
+## Solución de problemas
 
 ### "No se pudo conectar al bridge"
-- Verifica que `node bridge.js` esté corriendo
-- Verifica que el servidor C esté corriendo en el mismo puerto
+- Verifica que `node bridge.js` esté corriendo en la terminal 2.
+- Verifica que el puerto 4000 no esté ocupado.
 
 ### "No compila el frontend"
 Asegúrate de haber corrido `npm install` dentro de `chat-frontend/frontend`.
 
 ### WSL: el bridge no puede conectarse al servidor C
-Si el servidor corre en WSL y el bridge en Windows, usa la IP de WSL:
+Si el servidor corre en WSL y el bridge en Windows, necesitas la IP de WSL:
 
 ```bash
-# En WSL, corre esto para ver tu IP:
+# En WSL:
 hostname -I
-# Usa esa IP en el bridge:
+# Usa esa IP:
 set CHAT_HOST=<ip-de-wsl> && node bridge.js
 ```
 
 ### Puerto 3000 o 4000 ya en uso
 ```bash
-# Cambiar puerto del bridge (en bridge.js, línea: const BRIDGE_PORT = 4000)
 # Cambiar puerto del frontend:
 PORT=3001 npm start
+
+# Cambiar puerto del bridge (variable de entorno):
+BRIDGE_PORT=4001 node bridge.js
 ```

@@ -1,101 +1,68 @@
 # Chat en C — Proyecto 1
 
-Sistema de chat cliente-servidor desarrollado en C utilizando sockets TCP, multithreading con pthreads y un protocolo binario de paquetes fijos de 1024 bytes.
+Sistema de chat cliente-servidor desarrollado en C utilizando sockets TCP, multithreading con pthreads y un protocolo binario de paquetes fijos de 1024 bytes. Proyecto del curso de Sistemas Operativos (CC3064) de la Universidad del Valle de Guatemala.
 
 ## Descripción
 
-La aplicación permite que múltiples clientes se conecten a un servidor central para intercambiar mensajes en tiempo real. El servidor gestiona las conexiones de forma concurrente mediante threads, manteniendo una lista de usuarios conectados con su estado y dirección IP. Los clientes pueden enviar mensajes a todos (broadcasting), mensajes directos privados, cambiar su estado, consultar usuarios conectados y obtener información de usuarios específicos.
+La aplicación permite que múltiples clientes se conecten a un servidor central para intercambiar mensajes en tiempo real. El servidor gestiona las conexiones de forma concurrente mediante threads, manteniendo una lista de usuarios conectados con su estado y dirección IP.
 
 El protocolo de comunicación utiliza un `struct` binario (`ChatPacket`) de exactamente 1024 bytes, compatible con la especificación acordada entre todos los grupos del curso.
+
+## Arquitectura
+
+El proyecto tiene dos capas independientes que comparten únicamente el protocolo binario:
+
+```
+┌──────────────────┐     ┌───────────────┐     ┌──────────────────┐
+│ Cliente terminal │────►│               │◄────│ Browser (React)  │
+│ ./cliente        │ TCP │  ./servidor   │ TCP │   ↕ WebSocket    │
+│                  │     │   (puerto C)  │     │ Bridge (Node.js) │
+└──────────────────┘     └───────────────┘     └──────────────────┘
+```
+
+El servidor C es agnóstico al tipo de cliente. El bridge Node.js traduce WebSocket ↔ TCP binario, abriendo una conexión independiente por cada usuario del browser.
 
 ## Estructura del Proyecto
 
 ```
 CC3064-Proyecto-1/
-├── Makefile                          # Compilación del proyecto
+├── Makefile
+├── docker-compose.yml
+├── docker/
+│   └── servidor.Dockerfile
 ├── src/
-│   ├── protocolo.h                   # Definición del protocolo (struct de 1024 bytes)
+│   ├── protocolo.h                   # Struct ChatPacket (1024 bytes)
 │   ├── server/
-│   │   ├── servidor.c                # Main del servidor: accept loop, threads, monitor de inactividad
-│   │   ├── client_list.h             # Interfaz del módulo de lista de clientes
-│   │   ├── client_list.c             # Lista de clientes thread-safe con mutex
-│   │   ├── server_handlers.h         # Interfaz de los handlers de comandos
-│   │   └── server_handlers.c         # Lógica para cada comando del protocolo
+│   │   ├── servidor.c                # Accept loop, threads, monitor de inactividad
+│   │   ├── client_list.h / .c        # Lista de clientes thread-safe (mutex)
+│   │   └── server_handlers.h / .c    # Handler por cada comando del protocolo
 │   └── client/
-│       ├── cliente.c                 # Main del cliente: conexión, thread receptor, input loop
-│       ├── client_net.h              # Interfaz del módulo de red
-│       ├── client_net.c              # Conexión TCP y constructores de paquetes
-│       ├── client_ui.h               # Interfaz del módulo de UI
-│       └── client_ui.c               # Parsing de comandos y visualización de mensajes
+│       ├── cliente.c                 # Conexión, thread receptor, input loop
+│       ├── client_net.h / .c         # Conexión TCP y constructores de paquetes
+│       └── client_ui.h / .c          # Parsing de comandos y display de mensajes
+└── chat-frontend/                    # Frontend web (ver chat-frontend/README.md)
+    ├── bridge/                       # Bridge WebSocket ↔ TCP (Node.js)
+    └── frontend/                     # React app
 ```
 
-### Módulos
-
-| Módulo                    | Archivos              | Responsabilidad                                                       |
-| ------------------------- | --------------------- | --------------------------------------------------------------------- |
-| **Protocolo**             | `protocolo.h`         | Define `ChatPacket`, códigos de comando, estados y timeout            |
-| **Lista de clientes**     | `client_list.h/c`     | CRUD de usuarios conectados, protegido con `pthread_mutex_t`          |
-| **Handlers del servidor** | `server_handlers.h/c` | Procesa cada tipo de comando recibido de los clientes                 |
-| **Servidor**              | `servidor.c`          | Accept loop, crea un thread por cliente, monitor de inactividad       |
-| **Red del cliente**       | `client_net.h/c`      | Conexión TCP y funciones para construir y enviar cada tipo de paquete |
-| **UI del cliente**        | `client_ui.h/c`       | Interpreta comandos del usuario y formatea mensajes entrantes         |
-| **Cliente**               | `cliente.c`           | Registro, thread receptor de mensajes, loop de entrada del usuario    |
-
-## Cómo Ejecutar
+## Quick Start
 
 ### Requisitos
 
 - GCC con soporte para pthreads
-- Sistema operativo Linux (o WSL)
+- Linux o WSL
 - `make`
 
-### Compilación
+### Compilar y ejecutar
 
 ```bash
-make
+make                              # genera ./servidor y ./cliente
+
+./servidor 8080                   # iniciar servidor
+./cliente alice 127.0.0.1 8080    # conectar un cliente
 ```
 
-Esto genera dos binarios en la raíz del proyecto: `servidor` y `cliente`.
-
-Para limpiar los binarios y archivos objeto:
-
-```bash
-make clean
-```
-
-### Iniciar el servidor
-
-```bash
-./servidor <puerto>
-```
-
-Ejemplo:
-
-```bash
-./servidor 8080
-```
-
-### Conectar un cliente
-
-```bash
-./cliente <usuario> <IP_servidor> <puerto>
-```
-
-Ejemplo local:
-
-```bash
-./cliente alice 127.0.0.1 8080
-```
-
-Ejemplo remoto (EC2):
-
-```bash
-./cliente alice 54.123.45.67 8080
-```
-
-## Cómo Usar
-
-Una vez conectado, el cliente acepta los siguientes comandos:
+### Cliente de terminal — Comandos
 
 | Comando                            | Descripción                                         |
 | ---------------------------------- | --------------------------------------------------- |
@@ -107,79 +74,66 @@ Una vez conectado, el cliente acepta los siguientes comandos:
 | `/help`                            | Muestra la ayuda con todos los comandos             |
 | `/exit`                            | Cierra la sesión y sale del chat                    |
 
-### Ejemplo de sesión
+### Frontend web
 
+El proyecto incluye una interfaz web en React con un bridge Node.js. Consulta [chat-frontend/README.md](chat-frontend/README.md) para instalación y uso detallado.
+
+## Despliegue con Docker
+
+Un solo comando levanta servidor C + bridge + frontend:
+
+```bash
+docker compose up --build -d
 ```
-$ ./cliente alice 127.0.0.1 8080
-[OK] Bienvenido alice
-Conectado como 'alice'. Escribe /help para ver comandos.
 
-> /broadcast Hola a todos!
-[alice] Hola a todos!
-> /msg bob Hey, ¿cómo estás?
-> [DM de bob] Bien, gracias!
-> /status BUSY
-[OK] BUSY
-> /list
+| Servicio   | Puerto | Descripción                 |
+| ---------- | ------ | --------------------------- |
+| `servidor` | `8080` | Servidor C (TCP)            |
+| `bridge`   | `4000` | Bridge WebSocket ↔ TCP      |
+| `frontend` | `3000` | React app servida con nginx |
 
---- Usuarios conectados ---
-  alice                [BUSY]
-  bob                  [ACTIVE]
-----------------------------
+Acceder: `http://localhost:3000` (o `http://<IP-PUBLICA>:3000` desde otra máquina).
 
-> /info bob
+Detener: `docker compose down`
 
---- Info de usuario ---
-  IP:     192.168.1.10
-  Status: ACTIVE
------------------------
+### Despliegue en EC2 con Docker
 
-> /exit
-¡Hasta luego!
-```
+1. Instalar Docker en la instancia EC2:
+   ```bash
+   sudo apt update && sudo apt install -y docker.io docker-compose-v2
+   sudo usermod -aG docker $USER
+   ```
+
+2. Clonar el repo y levantar:
+   ```bash
+   git clone https://github.com/<tu-usuario>/<tu-repo>.git
+   cd CC3064-Proyecto-1
+   docker compose up --build -d
+   ```
+
+3. Abrir puertos en el **Security Group**: `3000`, `4000` y `8080` (Custom TCP, origen `0.0.0.0/0`)
+
+4. Acceder desde cualquier browser: `http://<IP-PUBLICA-EC2>:3000`
 
 ## Principales Features
 
-- **Multithreading en el servidor**: cada cliente es atendido por un thread dedicado, permitiendo concurrencia real en el manejo de conexiones y mensajes.
-- **Protocolo binario de 1024 bytes**: paquetes de tamaño fijo que simplifican la lectura/escritura en red y garantizan compatibilidad entre grupos.
-- **Thread-safety**: la lista de clientes está protegida con `pthread_mutex_t` para evitar condiciones de carrera.
-- **Detección de inactividad**: un thread monitor revisa periódicamente la actividad de cada cliente y cambia automáticamente su estado a `INACTIVE` tras 60 segundos sin actividad.
-- **Desconexión controlada y abrupta**: el servidor maneja tanto el logout voluntario (`/exit`) como la caída inesperada del cliente (detección por `recv()` retornando 0 o -1), notificando a los demás usuarios en ambos casos.
-- **Broadcasting y mensajes directos**: soporte completo para chat general y mensajes privados entre usuarios.
-- **Interfaz con colores**: los mensajes se muestran con colores ANSI para diferenciar mensajes del servidor, broadcasts, mensajes directos y errores.
+- **Multithreading en el servidor**: un thread dedicado por cliente para concurrencia real.
+- **Protocolo binario de 1024 bytes**: paquetes de tamaño fijo compatibles entre grupos.
+- **Thread-safety**: lista de clientes protegida con `pthread_mutex_t`.
+- **Detección de inactividad**: thread monitor cambia estado a `INACTIVE` tras 60 segundos sin actividad; se reactiva automáticamente al enviar cualquier comando.
+- **Desconexión controlada y abrupta**: maneja logout voluntario y caída inesperada, notificando a los demás.
+- **Broadcasting y mensajes directos**: chat general y mensajes privados.
+- **Frontend web**: interfaz React con dark theme, lista de usuarios en tiempo real y mensajes directos.
+- **Docker Compose**: despliegue de toda la aplicación con un solo comando.
 
-## Basic Troubleshooting
+## Troubleshooting
 
-### "bind: Address already in use"
+| Problema                         | Solución                                                                   |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| `bind: Address already in use`   | Espera unos segundos o usa otro puerto (`./servidor 8081`)                 |
+| `connect: Connection refused`    | Verifica que el servidor esté corriendo. En EC2, revisa el Security Group. |
+| `Usuario ya existe`              | Usa un nombre de usuario diferente                                         |
+| El estado cambia a INACTIVE solo | Normal: 60s sin actividad. Envía cualquier comando para reactivarte.       |
+| No compila                       | `sudo apt install build-essential`                                         |
 
-El puerto está ocupado por otra instancia del servidor o un proceso previo que no liberó el socket. Espera unos segundos o usa otro puerto:
-
-```bash
-./servidor 8081
-```
-
-### "connect: Connection refused"
-
-- Verifica que el servidor esté corriendo en la IP y puerto indicados.
-- Si usas EC2, asegúrate de que el Security Group tenga una regla Custom TCP con el puerto abierto y origen `0.0.0.0/0`.
-
-### "Usuario ya existe"
-
-Otro cliente ya está registrado con ese nombre o desde esa IP. Usa un nombre de usuario diferente.
-
-### El cliente se congela o no muestra mensajes
-
-- Verifica que la conexión de red entre cliente y servidor esté activa.
-- Si el servidor se cayó, el cliente mostrará `[!] Conexión con el servidor perdida.`
-
-### El estado cambia a INACTIVE automáticamente
-
-Esto es normal. El servidor marca como `INACTIVE` a cualquier cliente que no envíe comandos durante 60 segundos. Envía cualquier comando o cambia tu estado con `/status ACTIVE` para reactivarte.
-
-### No compila
-
-Asegúrate de tener `gcc` y `make` instalados:
-
-```bash
-sudo apt update && sudo apt install build-essential
-```
+Para problemas del frontend web, consulta [chat-frontend/README.md](chat-frontend/README.md#solución-de-problemas).
