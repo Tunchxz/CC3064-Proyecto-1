@@ -26,37 +26,37 @@ static void *client_thread(void *arg) {
         if (recv_packet(sockfd, &pkt) != 0)
             break; /* disconnect or error */
 
-        /* Update activity timestamp; reactivate if was INACTIVE */
-        if (cl_touch(sockfd)) {
-            ChatPacket notif;
-            memset(&notif, 0, sizeof(notif));
-            notif.command = CMD_MSG;
-            strncpy(notif.sender, "SERVER", 31);
-            strncpy(notif.payload, "Tu status volvió a ACTIVE", 956);
-            notif.payload_len = (uint16_t)strlen(notif.payload);
-            send_packet(sockfd, &notif);
-            printf("[SERVER] %s reactivado a ACTIVE\n", pkt.sender);
-        }
-
         switch (pkt.command) {
         case CMD_REGISTER:
-            /* client_ip was stored during accept; retrieve from list after add.
-               Here we handle it in accept below, so register is called from there. */
             break;
         case CMD_BROADCAST:
-            handle_broadcast(sockfd, &pkt);
-            break;
         case CMD_DIRECT:
-            handle_direct(sockfd, &pkt);
+        case CMD_STATUS:
+            /* Only real user activity resets the inactivity timer.
+               LIST/INFO are queries (sent automatically by frontend polling)
+               and must NOT count as activity. */
+            if (cl_touch(sockfd)) {
+                ChatPacket notif;
+                memset(&notif, 0, sizeof(notif));
+                notif.command = CMD_MSG;
+                strncpy(notif.sender, "SERVER", 31);
+                strncpy(notif.payload, "Tu status volvió a ACTIVE", 956);
+                notif.payload_len = (uint16_t)strlen(notif.payload);
+                send_packet(sockfd, &notif);
+                printf("[SERVER] %s reactivado a ACTIVE\n", pkt.sender);
+            }
+            if (pkt.command == CMD_BROADCAST)
+                handle_broadcast(sockfd, &pkt);
+            else if (pkt.command == CMD_DIRECT)
+                handle_direct(sockfd, &pkt);
+            else
+                handle_status(sockfd, &pkt);
             break;
         case CMD_LIST:
             handle_list(sockfd, &pkt);
             break;
         case CMD_INFO:
             handle_info(sockfd, &pkt);
-            break;
-        case CMD_STATUS:
-            handle_status(sockfd, &pkt);
             break;
         case CMD_LOGOUT:
             strncpy(username, pkt.sender, 31);
