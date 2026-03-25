@@ -89,6 +89,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .loginLabel {
@@ -101,6 +102,7 @@
 }
 
 .loginInput {
+  width: 100%;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -318,7 +320,7 @@
 
 /* Secciones del sidebar */
 .sideSection {
-  padding: 16px 8px 8px;
+  padding: 16px 10px 10px;
 }
 
 .sideSectionHeader {
@@ -512,7 +514,7 @@
   padding: 24px 24px 8px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .emptyState {
@@ -633,7 +635,7 @@
 }
 
 .msgBubble {
-  padding: 9px 14px;
+  padding: 10px 16px;
   border-radius: var(--radius-lg);
   display: flex;
   align-items: flex-end;
@@ -743,7 +745,8 @@
   background: var(--bg-sidebar);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  width: 320px;
+  width: 340px;
+  max-width: calc(100vw - 40px);
   box-shadow: var(--shadow-card);
   animation: slideUp .25s cubic-bezier(.16,1,.3,1) both;
 }
@@ -778,15 +781,14 @@
 
 .modalBody {
   padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px 20px;
+  align-items: baseline;
 }
 
 .modalRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: contents;
 }
 
 .modalKey {
@@ -795,6 +797,7 @@
   letter-spacing: .08em;
   color: var(--text-muted);
   font-family: var(--font-mono);
+  white-space: nowrap;
 }
 
 .modalVal {
@@ -815,5 +818,5 @@
 .loginRow {
   display: flex;
   gap: 12px;
-  align-items: flex-end;
+  align-items: stretch;
 }

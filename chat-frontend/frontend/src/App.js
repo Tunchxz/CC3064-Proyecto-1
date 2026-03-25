@@ -182,6 +182,29 @@ function UserInfoModal({ info, onClose }) {
   );
 }
 
+// ── Ayuda ────────────────────────────────────────────────────────────────────
+
+function HelpModal({ onClose }) {
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modalCard} onClick={e => e.stopPropagation()} style={{ width: 460 }}>
+        <div className={styles.modalHeader}>
+          <span>Ayuda</span>
+          <button className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+        <div className={styles.modalBody}>
+          <div className={styles.modalRow}><span className={styles.modalKey}>Broadcast</span><span className={styles.modalVal}>Escribe en el canal <b>#General</b></span></div>
+          <div className={styles.modalRow}><span className={styles.modalKey}>Mensaje directo</span><span className={styles.modalVal}>Clic en un usuario del sidebar</span></div>
+          <div className={styles.modalRow}><span className={styles.modalKey}>Cambiar estado</span><span className={styles.modalVal}>Clic en tu estado (● Activo ▾)</span></div>
+          <div className={styles.modalRow}><span className={styles.modalKey}>Lista de usuarios</span><span className={styles.modalVal}>Sidebar, o botón ↻ para refrescar</span></div>
+          <div className={styles.modalRow}><span className={styles.modalKey}>Info de usuario</span><span className={styles.modalVal}>Botón ⓘ junto a cada usuario</span></div>
+          <div className={styles.modalRow}><span className={styles.modalKey}>Salir</span><span className={styles.modalVal}>Botón ⏻ arriba a la izquierda</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Chat ─────────────────────────────────────────────────────────────────────
 
 function ChatScreen({ hook }) {
@@ -193,6 +216,7 @@ function ChatScreen({ hook }) {
 
   const [input, setInput] = useState('');
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -203,7 +227,10 @@ function ChatScreen({ hook }) {
     if (activeChat === 'ALL') {
       return m.type === 'broadcast' || m.type === 'system' || m.type === 'error';
     }
-    return m.type === 'direct' && (m.sender === activeChat || m.sender === username);
+    return m.type === 'direct' && (
+      (m.sender === activeChat && m.target === username) ||
+      (m.sender === username && m.target === activeChat)
+    );
   });
 
   const handleSend = (e) => {
@@ -222,6 +249,7 @@ function ChatScreen({ hook }) {
   return (
     <div className={styles.chatWrap}>
       <UserInfoModal info={userInfo} onClose={() => setUserInfo(null)} />
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
 
       {/* Sidebar */}
       <aside className={styles.sidebar}>
@@ -250,6 +278,7 @@ function ChatScreen({ hook }) {
               </div>
             )}
           </div>
+          <button className={styles.logoutBtn} onClick={() => setShowHelp(true)} title="Ayuda" style={{ fontSize: 14 }}>?</button>
           <button className={styles.logoutBtn} onClick={logout} title="Salir">⏻</button>
         </div>
 
