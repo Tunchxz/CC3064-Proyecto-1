@@ -4,3 +4,47 @@ cliente
 
 # Object files
 *.o
+
+# Dependency files
+*.d
+*.d.*
+
+# Libraries
+*.a
+*.so
+*.so.*
+
+# Executables / misc build outputs
+*.out
+*.exe
+
+# Debug / crash dumps
+core
+core.*
+vgcore.*
+gmon.out
+
+# Logs
+*.log
+
+# Coverage / profiling
+*.gcda
+*.gcno
+*.gcov
+coverage/
+
+# Editor / OS
+.DS_Store
+
+# Node / frontend
+**/node_modules/
+**/dist/
+**/build/
+**/.cache/
+**/.vite/
+**/coverage/
+**/.env
+**/.env.*
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
