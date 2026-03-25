@@ -12,9 +12,6 @@ services:
       context: chat-frontend/bridge
     ports:
       - "4000:4000"
-    environment:
-      - CHAT_HOST=servidor
-      - CHAT_PORT=8080
     depends_on:
       - servidor
     restart: unless-stopped
