@@ -28,6 +28,7 @@ export function useChat() {
   const usernameRef = useRef('');
   const voluntaryLogout = useRef(false);
   const pollTimer = useRef(null);
+  const pendingInfoTarget = useRef('');
 
   // ── CLAVE: ref para que onmessage siempre llame a la versión más reciente ─
   const handlePacketRef = useRef(null);
@@ -172,7 +173,7 @@ export function useChat() {
       }
 
       case CMD.USER_INFO:
-        setUserInfo({ raw: pkt.payload, target: pkt.target });
+        setUserInfo({ raw: pkt.payload, target: pendingInfoTarget.current || pkt.target });
         break;
 
       case CMD.DISCONNECTED:
@@ -261,6 +262,7 @@ export function useChat() {
   }, [send]);
 
   const getInfo = useCallback((target) => {
+    pendingInfoTarget.current = target;
     send({ command: CMD.INFO, sender: usernameRef.current, target, payload: '' });
   }, [send]);
 
