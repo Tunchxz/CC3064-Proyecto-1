@@ -1,0 +1,29 @@
+services:
+  servidor:
+    build:
+      context: .
+      dockerfile: docker/servidor.Dockerfile
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  bridge:
+    build:
+      context: chat-frontend/bridge
+    ports:
+      - "4000:4000"
+    environment:
+      - CHAT_HOST=servidor
+      - CHAT_PORT=8080
+    depends_on:
+      - servidor
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: chat-frontend/frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - bridge
+    restart: unless-stopped

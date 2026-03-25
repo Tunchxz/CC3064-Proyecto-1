@@ -6,7 +6,10 @@ const CMD = {
   MSG: 10, USER_LIST: 11, USER_INFO: 12, DISCONNECTED: 13,
 };
 
-const BRIDGE_URL = 'ws://localhost:4000';
+/* Derive bridge URL from the page's hostname so it works on any deployment
+   (localhost for dev, public IP for EC2/Docker). Override with env var at build time. */
+const BRIDGE_URL = process.env.REACT_APP_BRIDGE_URL
+  || `ws://${window.location.hostname}:4000`;
 const POLL_INTERVAL_MS = 15_000;
 
 export function useChat() {

@@ -48,3 +48,8 @@ coverage/
 **/npm-debug.log*
 **/yarn-debug.log*
 **/yarn-error.log*
+
+# AI files
+CLAUDE.md
+skills*.json
+/.agents

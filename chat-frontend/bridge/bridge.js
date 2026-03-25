@@ -10,7 +10,12 @@ const WebSocket = require("ws");
 const WebSocketServer = WebSocket.Server;
 
 const WS_OPEN = 1;
-const BRIDGE_PORT = 4000;
+const BRIDGE_PORT = parseInt(process.env.BRIDGE_PORT) || 4000;
+
+/* When set, these override the host/port sent by the frontend.
+   In Docker, CHAT_HOST=servidor routes to the C server container. */
+const ENV_HOST = process.env.CHAT_HOST || null;
+const ENV_PORT = process.env.CHAT_PORT ? parseInt(process.env.CHAT_PORT) : null;
 
 const CMD = {
   REGISTER: 1, BROADCAST: 2, DIRECT: 3, LIST: 4,
@@ -68,8 +73,8 @@ wss.on("connection", (ws) => {
       return ws.close();
     }
 
-    const host = init.host.trim();
-    const port = parseInt(init.port);
+    const host = ENV_HOST || init.host.trim();
+    const port = ENV_PORT || parseInt(init.port);
     console.log(`[Bridge] Conectando TCP → ${host}:${port}`);
 
     tcp.connect(port, host, () => {
