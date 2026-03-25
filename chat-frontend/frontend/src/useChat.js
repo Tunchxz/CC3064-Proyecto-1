@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 const CMD = {
   REGISTER: 1, BROADCAST: 2, DIRECT: 3, LIST: 4,
@@ -7,13 +7,7 @@ const CMD = {
 };
 
 const BRIDGE_URL = 'ws://localhost:4000';
-
-// Patrones que el servidor puede mandar para indicar cambio de status
-const STATUS_PATTERNS = {
-  ACTIVE:   /activ/i,
-  BUSY:     /ocup|busy/i,
-  INACTIVE: /inactiv/i,
-};
+const POLL_INTERVAL_MS = 15_000;
 
 export function useChat() {
   const [phase, setPhase] = useState('login');
@@ -29,8 +23,11 @@ export function useChat() {
   const ws = useRef(null);
   const pendingUser = useRef('');
   const usernameRef = useRef('');
-  // Flag para distinguir logout voluntario de caída del servidor
   const voluntaryLogout = useRef(false);
+  const pollTimer = useRef(null);
+
+  // ── CLAVE: ref para que onmessage siempre llame a la versión más reciente ─
+  const handlePacketRef = useRef(null);
 
   const addMessage = useCallback((msg) => {
     setMessages(prev => [...prev, { ...msg, id: Date.now() + Math.random(), ts: new Date() }]);
@@ -42,16 +39,34 @@ export function useChat() {
     }
   }, []);
 
-  const handlePacket = useCallback((pkt) => {
+  // ── Polling ───────────────────────────────────────────────────────────────
+
+  const startPolling = useCallback(() => {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+    pollTimer.current = setInterval(() => {
+      if (ws.current && ws.current.readyState === WebSocket.OPEN && usernameRef.current) {
+        ws.current.send(JSON.stringify({
+          command: CMD.LIST, sender: usernameRef.current, target: '', payload: '',
+        }));
+      }
+    }, POLL_INTERVAL_MS);
+  }, []);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimer.current) { clearInterval(pollTimer.current); pollTimer.current = null; }
+  }, []);
+
+  // ── Handler de paquetes ───────────────────────────────────────────────────
+  // NO está en useCallback — se redefine en cada render y se guarda en el ref
+  // para que onmessage siempre use la versión actualizada con el estado actual.
+
+  const handlePacket = (pkt) => {
     const user = pendingUser.current;
 
-    // Señal interna del bridge: TCP listo → registrar
+    // Señal interna bridge → TCP listo → registrar
     if (pkt.command === 0 && pkt.payload === 'tcp_ok') {
       ws.current.send(JSON.stringify({
-        command: CMD.REGISTER,
-        sender: user,
-        target: '',
-        payload: user,
+        command: CMD.REGISTER, sender: user, target: '', payload: user,
       }));
       return;
     }
@@ -72,8 +87,8 @@ export function useChat() {
               }));
             }
           }, 200);
+          startPolling();
         } else if (['ACTIVE', 'BUSY', 'INACTIVE'].includes(pkt.payload)) {
-          // Confirmación de cambio de status manual
           setMyStatus(pkt.payload);
           addMessage({ type: 'system', sender: 'SISTEMA', text: `Estado cambiado a ${pkt.payload}` });
         }
@@ -92,18 +107,29 @@ export function useChat() {
       case CMD.MSG: {
         const me = usernameRef.current;
 
-        // Detectar si el servidor nos avisa de un cambio de status automático
-        // El servidor manda: sender="SERVER", payload="Tu status cambió a INACTIVE"
-        if (pkt.sender === 'SERVER' && pkt.target === me) {
-          for (const [status, pattern] of Object.entries(STATUS_PATTERNS)) {
-            if (pattern.test(pkt.payload)) {
-              setMyStatus(status);
-              break;
-            }
+        // Mensajes del servidor sobre cambio de status automático
+        // servidor.c envía: CMD_MSG, sender="SERVER", target=username, payload="Tu status cambió a INACTIVE"
+        // servidor.c envía: CMD_MSG, sender="SERVER", payload="Tu status volvió a ACTIVE"
+        if (pkt.sender === 'SERVER') {
+          const p = pkt.payload;
+
+          if (p.includes('INACTIVE')) {
+            setMyStatus('INACTIVE');
+            addMessage({ type: 'system', sender: 'SISTEMA', text: 'Tu estado cambió a Inactivo por inactividad.' });
+            break;
           }
+
+          if (p.includes('ACTIVE')) {
+            setMyStatus('ACTIVE');
+            addMessage({ type: 'system', sender: 'SISTEMA', text: 'Tu estado volvió a Activo.' });
+            break;
+          }
+
+          addMessage({ type: 'system', sender: 'SISTEMA', text: p });
+          break;
         }
 
-        // Ignorar eco de nuestros propios mensajes
+        // Ignorar eco de mis propios mensajes
         if (pkt.sender === me) break;
 
         addMessage({
@@ -121,6 +147,24 @@ export function useChat() {
           return { name, status: status || 'ACTIVE' };
         });
         setUsers(parsed);
+
+        // Respaldo: detectar cambio de status desde la lista
+        const me = usernameRef.current;
+        if (me) {
+          const myEntry = parsed.find(u => u.name === me);
+          if (myEntry) {
+            setMyStatus(prev => {
+              if (prev !== myEntry.status) {
+                if (myEntry.status === 'INACTIVE') {
+                  addMessage({ type: 'system', sender: 'SISTEMA', text: 'Tu estado cambió a Inactivo por inactividad.' });
+                } else if (myEntry.status === 'ACTIVE' && prev === 'INACTIVE') {
+                  addMessage({ type: 'system', sender: 'SISTEMA', text: 'Tu estado volvió a Activo.' });
+                }
+              }
+              return myEntry.status;
+            });
+          }
+        }
         break;
       }
 
@@ -136,7 +180,13 @@ export function useChat() {
       default:
         break;
     }
-  }, [addMessage]);
+  };
+
+  // Actualizar el ref en cada render para que onmessage siempre tenga acceso
+  // al handler con el estado más reciente (evita stale closure)
+  handlePacketRef.current = handlePacket;
+
+  // ── Conexión ──────────────────────────────────────────────────────────────
 
   const connect = useCallback((user, host, port) => {
     if (ws.current) ws.current.close();
@@ -154,8 +204,11 @@ export function useChat() {
       socket.send(JSON.stringify({ type: 'connect', host, port }));
     };
 
+    // onmessage llama SIEMPRE al ref → nunca queda atrapado en un closure viejo
     socket.onmessage = (e) => {
-      try { handlePacket(JSON.parse(e.data)); } catch {}
+      try { handlePacketRef.current(JSON.parse(e.data)); } catch(err) {
+        console.error('[useChat] Error procesando paquete:', err);
+      }
     };
 
     socket.onerror = () => {
@@ -165,10 +218,8 @@ export function useChat() {
 
     socket.onclose = () => {
       setWsStatus('disconnected');
-
-      // Si había sesión activa y NO fue logout voluntario → servidor caído
+      stopPolling();
       if (usernameRef.current && !voluntaryLogout.current) {
-        // Volver al login con mensaje de error
         usernameRef.current = '';
         setPhase('login');
         setMessages([]);
@@ -179,9 +230,11 @@ export function useChat() {
         setLoginError('⚠ Conexión perdida: el servidor se apagó o no está disponible.');
       }
     };
-  }, [handlePacket]);
+  }, [stopPolling]);
 
-  // ── Acciones ───────────────────────────────────────────────────────────────
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
+  // ── Acciones ──────────────────────────────────────────────────────────────
 
   const sendBroadcast = useCallback((text) => {
     const me = usernameRef.current;
@@ -196,6 +249,7 @@ export function useChat() {
   }, [send, addMessage]);
 
   const changeStatus = useCallback((status) => {
+    setMyStatus(status);
     send({ command: CMD.STATUS, sender: usernameRef.current, target: '', payload: status });
   }, [send]);
 
@@ -208,7 +262,8 @@ export function useChat() {
   }, [send]);
 
   const logout = useCallback(() => {
-    voluntaryLogout.current = true; // marcar que fue intencional
+    voluntaryLogout.current = true;
+    stopPolling();
     send({ command: CMD.LOGOUT, sender: usernameRef.current, target: '', payload: '' });
     ws.current?.close();
     usernameRef.current = '';
@@ -219,7 +274,7 @@ export function useChat() {
     setMyStatus('ACTIVE');
     setActiveChat('ALL');
     setLoginError('');
-  }, [send]);
+  }, [send, stopPolling]);
 
   return {
     phase, username, myStatus, messages, users, activeChat, userInfo,
