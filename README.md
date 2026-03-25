@@ -1,6 +1,6 @@
-# Chat en C — Proyecto 1
+# Proyecto 1: Chat en C
 
-Sistema de chat cliente-servidor desarrollado en C utilizando sockets TCP, multithreading con pthreads y un protocolo binario de paquetes fijos de 1024 bytes. Proyecto del curso de Sistemas Operativos (CC3064) de la Universidad del Valle de Guatemala.
+Sistema de chat cliente-servidor desarrollado en C utilizando sockets TCP, multithreading con pthreads y un protocolo binario de paquetes fijos de 1024 bytes.
 
 ## Descripción
 
@@ -59,7 +59,7 @@ CC3064-Proyecto-1/
 make                              # genera ./servidor y ./cliente
 
 ./servidor 8080                   # iniciar servidor
-./cliente alice 127.0.0.1 8080    # conectar un cliente
+./cliente sebas 127.0.0.1 8080    # conectar un cliente
 ```
 
 ### Cliente de terminal — Comandos
@@ -106,7 +106,7 @@ Detener: `docker compose down`
 
 2. Clonar el repo y levantar:
    ```bash
-   git clone https://github.com/<tu-usuario>/<tu-repo>.git
+   git clone https://github.com/Tunchxz/CC3064-Proyecto-1.git
    cd CC3064-Proyecto-1
    docker compose up --build -d
    ```
